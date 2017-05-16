@@ -6,15 +6,20 @@ const readline = require('readline');
 
 if (typeof module !== "undefined") {
     module.exports = { 
-        start: function() {
-            const rl = readline.createInterface({
-              input: process.stdin,
-              output: process.stdout
-            });
-
-            ask(rl);
-        }
+        start: startStandalone
     };
+} else {
+    startStandalone();
+}
+
+function startStandalone() {
+    console.log("Starting jukeboxify in standalone mode");
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+
+    ask(rl);
 }
 
 function ask(readline) {
@@ -22,8 +27,8 @@ function ask(readline) {
         jb.searchTrack(answer, function(song) {
             if (song) {
                 var nextSteps = function(song) {
-                    console.log("Track found: "+song)
-                    var votePos = indexInVotePool(song.id);
+                    console.log("Track found: "+song.name+" by "+song.artist)
+                    var votePos = jb.indexInVotePool(song.id);
                     var inPool = false;
                     var options = {
                         "add": {
@@ -31,7 +36,7 @@ function ask(readline) {
                             desc: "add to vote pool",
                             does: function(song) {
                                 jb.addSongToVotePool(song);
-                                console.log(printTopSongsByVotes());
+                                console.log(jb.printTopSongsByVotes());
                             }
                         },
                         "info": {
@@ -41,11 +46,18 @@ function ask(readline) {
                                 console.log(song);
                             }
                         },
+                        "preview": {
+                            command: "preview",
+                            desc: "get 30 second preview",
+                            does: function(song) {
+                                console.log(song.previewURL);
+                            }
+                        },
                         "search": {
                             command: "search",
                             desc: "search for another song",
                             does: function(song) {
-                                ask();
+                                ask(readline);
                             }
                         },
                         "up": {
@@ -53,7 +65,7 @@ function ask(readline) {
                             desc: "vote song up",
                             does: function(song) {
                                 jb.voteBySongId(song.id, 1);
-                                console.log(printTopSongsByVotes());
+                                console.log(jb.printTopSongsByVotes());
                             }
                         },
                         "down": {
@@ -61,11 +73,11 @@ function ask(readline) {
                             desc: "vote song down",
                             does: function(song) {
                                 jb.voteByIndex(votePos, -1);
-                                console.log(printTopSongsByVotes());
+                                console.log(jb.printTopSongsByVotes());
                             }
                         }
                     }
-                    var available = [options.info, options.search];
+                    var available = [options.info, options.preview, options.search];
                     if (votePos != -1) {
                         console.log("It is currently #"+(votePos+1)+" in the pool.")
                         inPool = true;
@@ -81,14 +93,23 @@ function ask(readline) {
                         question += "\t"+option.command+": "+option.desc+"\n"
                     }
                     readline.question(question+"> ", function(answer) {
-                        var realOpt = options[answer.trim()];
+                        var trimmed = answer.trim().toLowerCase();
+                        var realOpt = null;
+                        for (var opt in available) {
+                            if (available[opt].command === trimmed) {
+                                realOpt = available[opt];
+                                break;
+                            }
+                        }
                         if (realOpt) {
                             realOpt.does(song);
                             nextSteps(song);
                         } else {
-                            ask();
+                            console.log("'"+ trimmed + "' is not an available option.");
+                            ask(readline);
                         }
-                    })
+                    });
+                    return "";
                 };
                 nextSteps(song);
             }
